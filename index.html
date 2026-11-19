@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea">
+<title>模様替え</title>
+<style>
+:root{
+  --bg:#f4f1ea; --panel:#fbfaf6; --ink:#2b2a26; --sub:#6b675e; --line:#d8d2c4;
+  --grid1:#e6e0d3; --grid2:#cfc7b5; --wall:#3a3832; --furn:#e9dcc3; --furn-s:#8a7350;
+  --sel:#2f6f8f; --bad:#c2412d; --bad-bg:#f6d9d2; --door:#8a8578; --win:#6fa6c4; --ok:#3d7a4a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1d1c1a; --panel:#262522; --ink:#ece8df; --sub:#a39e93; --line:#3b3934;
+    --grid1:#2b2a27; --grid2:#3a3833; --wall:#d9d4c8; --furn:#4a4234; --furn-s:#c9ad7d;
+    --sel:#6fb3d6; --bad:#ff7a63; --bad-bg:#4a2620; --door:#a39e93; --win:#6fa6c4; --ok:#7cc48b;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:calc(15px * var(--k, 1))/1.5 system-ui,"Hiragino Sans","Yu Gothic UI",sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0 8px 0 0;letter-spacing:.08em}
+.wrap{display:grid;grid-template-columns:1fr 330px;gap:16px;padding:16px;align-items:start}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;position:sticky;top:8px}
+svg#plan{display:block;width:100%;max-height:calc(100dvh - 110px);touch-action:none;user-select:none;-webkit-user-select:none}
+aside{display:flex;flex-direction:column;gap:12px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.box h2{font-size:calc(13px * var(--k, 1));color:var(--sub);margin:0 0 8px;font-weight:600;letter-spacing:.05em}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+label{display:flex;flex-direction:column;font-size:calc(12px * var(--k, 1));color:var(--sub);gap:2px;flex:1;min-width:90px}
+input,select,button{font:inherit;font-size:calc(16px * max(1, var(--k, 1)));color:var(--ink)}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+button{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+button.main{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:disabled{opacity:.4}
+@media (hover:hover){button:hover{border-color:var(--sub)}}
+.hint{font-size:calc(12px * var(--k, 1));color:var(--sub);margin:4px 0 0}
+.list{display:flex;flex-wrap:wrap;gap:6px}
+.list button{font-size:14px;padding:4px 8px}
+.list button.on{border-color:var(--sel);color:var(--sel)}
+.list button.ng{color:var(--bad)}
+.slidepanel{stroke:var(--door);stroke-width:4}
+.slidezone{fill:var(--door);fill-opacity:.07;stroke:var(--door);stroke-dasharray:3 3;stroke-width:.8;pointer-events:none}
+.it.bad .slidezone{fill:var(--bad);stroke:var(--bad);fill-opacity:.15}
+.it.sel .slidepanel{stroke:var(--sel)}
+#warn{margin:0;padding-left:18px;font-size:calc(14px * var(--k, 1))}
+#warn li{color:var(--bad)}
+#warn.ok{list-style:none;padding:0;color:var(--ok)}
+.check{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--ink);flex:0}
+.check input{width:auto}
+header select{width:auto;min-width:90px}
+/* SVG */
+.g1{fill:none;stroke:var(--grid1);stroke-width:.5}
+.g2{fill:none;stroke:var(--grid2);stroke-width:.8}
+.wall{fill:none;stroke:var(--wall);stroke-width:6}
+.dim{fill:var(--sub)}
+.it rect.body{fill:var(--furn);stroke:var(--furn-s);stroke-width:1.2}
+.it .front{stroke:var(--furn-s);stroke-width:4}
+.it .zone{fill:var(--furn-s);fill-opacity:.08;stroke:var(--furn-s);stroke-dasharray:4 3;stroke-width:.8}
+.it text{fill:var(--ink);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.it.bad rect.body{fill:var(--bad-bg);stroke:var(--bad);stroke-width:3.5}
+.it.dark text{fill:#fff}
+.it.bad .zone{stroke:var(--bad);fill:var(--bad)}
+.it.sel rect.body{stroke:var(--sel);stroke-width:2.5}
+.it{cursor:grab}
+.doorgap{stroke:var(--panel);stroke-width:8}
+.doorarea{fill:var(--door);fill-opacity:.1}
+.doorleaf{stroke:var(--door);stroke-width:2;fill:none}
+.doorarc{stroke:var(--door);stroke-width:1;stroke-dasharray:3 3;fill:none}
+.it.bad .doorarea{fill:var(--bad);fill-opacity:.2}
+.winline{stroke:var(--win);stroke-width:6}
+.it.sel .winline,.it.sel .doorleaf{stroke:var(--sel)}
+.hit{fill:transparent;stroke:transparent}
+.hitline{stroke:transparent;stroke-width:20}
+/* ドアの開く範囲は見せるだけ。中にある家具をつかめるようにする */
+.doorarea,.doorarc,.it .zone{pointer-events:none}
+.gap{stroke:var(--sel);stroke-width:1}
+.gap.narrow{stroke:var(--bad)}
+.gaptxt{fill:var(--sel);font-weight:600;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--panel);stroke-width:4px}
+.gaptxt.narrow{fill:var(--bad)}
+@media (max-width:760px){
+  .wrap{grid-template-columns:1fr;padding:8px 16px 16px}
+  .stage{position:static}
+  svg#plan{max-height:62dvh} /* 図の上ではページが動かないので、下に指でスクロールできる余白を残す */
+  header{padding:8px 16px;gap:6px}
+  header button,header select{font-size:14px;padding:4px 8px}
+  h1{font-size:16px;margin-right:2px}
+}
+.v3d{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;flex-direction:column}
+.v3d-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+.v3d-bar .hint{margin:0}
+.v3d canvas{display:block;touch-action:none}
+.v3d-msg{padding:24px 16px;color:var(--sub)}
+@media print{header,aside{display:none}.wrap{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <h1>模様替え</h1>
+  <select id="planSel" aria-label="案を選ぶ"></select>
+  <button id="planNew">新しい案</button>
+  <button id="planCopy">案を複製</button>
+  <button id="planRen">名前を変える</button>
+  <button id="planDel">案を削除</button>
+  <button id="undo" title="Ctrl+Z">元に戻す</button>
+  <select id="fsSel" aria-label="文字の大きさ"><option value="0.8">文字 小</option><option value="1">文字 中</option><option value="1.3">文字 大</option><option value="1.7">文字 特大</option></select>
+  <button class="main" id="show3d">3D で見る</button>
+</header>
+<div class="wrap">
+  <div class="stage"><svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <aside>
+    <div class="box">
+      <h2>部屋の大きさ</h2>
+      <div class="row">
+        <label>横幅（cm）<input id="roomW" type="number" inputmode="numeric" min="50" step="1"></label>
+        <label>縦の長さ（cm）<input id="roomH" type="number" inputmode="numeric" min="50" step="1"></label>
+        <label>天井の高さ（cm）<input id="roomT" type="number" inputmode="numeric" min="100" step="1"></label>
+      </div>
+      <p class="hint"><span id="area"></span>壁の内側から内側までを測ります。6畳はおよそ 260×350cm です。</p>
+    </div>
+    <div class="box">
+      <h2>追加する</h2>
+      <div class="row">
+        <select id="preset" aria-label="家具の種類"></select>
+        <button class="main" id="addF">家具を追加</button>
+      </div>
+      <div class="row">
+        <button id="addDoor">開き戸を追加</button>
+        <button id="addSlide">引き戸を追加</button>
+        <button id="addWin">窓を追加</button>
+        <label class="check"><input type="checkbox" id="magnet" checked>壁や家具に吸い付ける</label>
+      </div>
+      <p class="hint">ドラッグで動かします。PC では Shift を押しながら動かすと吸い付きません。</p>
+    </div>
+    <div class="box" id="selBox"><h2>選んでいるもの</h2><div id="sel"></div></div>
+    <div class="box"><h2>注意</h2><ul id="warn"></ul></div>
+    <div class="box"><h2>置いたもの</h2><div id="list" class="list"></div></div>
+    <div class="box">
+      <h2>ファイル</h2>
+      <div class="row">
+        <button id="exp">ファイルに書き出す</button>
+        <button id="imp">ファイルを読み込む</button>
+        <button id="png">図を画像で保存</button>
+        <input type="file" id="impFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="hint">案はこのブラウザに自動で保存されます。別の端末に移すときはファイルを使います。</p>
+    </div>
+  </aside>
+</div>
+<script src="geom.js"></script>
+<script src="view3d.js"></script>
+<script>
+
+// 名前, 幅, 奥行き, 高さ, 前の空き（cm）。よくある大きさの目安
+const PRESETS = [
+  ['シングルベッド', 97, 195, 45, 0], ['セミダブルベッド', 120, 195, 45, 0], ['ダブルベッド', 140, 195, 45, 0],
+  ['二段ベッド', 100, 205, 160, 0], ['机', 100, 60, 72, 0], ['椅子', 45, 50, 80, 0], ['本棚', 80, 30, 180, 0],
+  ['カラーボックス', 42, 29, 88, 0], ['チェスト', 80, 45, 100, 60], ['洋服タンス', 100, 60, 180, 60],
+  ['洋服ラック', 90, 45, 150, 0], ['ソファ', 160, 80, 80, 0], ['テレビ台', 120, 40, 45, 0], ['テレビ', 100, 20, 65, 0],
+  ['ローテーブル', 90, 50, 40, 0], ['ダイニングテーブル', 120, 75, 70, 0], ['こたつ', 105, 75, 40, 0],
+  ['収納ケース', 40, 75, 30, 0], ['冷蔵庫', 60, 65, 170, 60], ['ゲーミングチェア', 70, 70, 130, 0],
+  ['柱・出っ張り', 30, 30, 240, 0], ['自由な家具', 60, 60, 60, 0],
+];
+const WALLS = { top: '上の壁', bottom: '下の壁', right: '右の壁', left: '左の壁' };
+const KEY = 'moyougae.v1', NARROW = 60;
+const $ = id => document.getElementById(id);
+const svg = $('plan');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const newPlan = name => ({ name, room: { w: 270, h: 360, ht: 240 }, items: [] });
+
+let state, sel = null, hist = [], drag = null;
+try { state = G.clean(JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
+if (!state) state = { plans: [newPlan('案A')], cur: 0 };
+let saveFailed = false;
+// 文字の大きさは端末ごとの好みなので、案とは別に保存する
+let TS = 1;
+try { TS = [0.8, 1, 1.3, 1.7].includes(Number(localStorage.getItem('moyougae.fs'))) ? Number(localStorage.getItem('moyougae.fs')) : 1; } catch (e) {}
+const applyTS = () => { document.documentElement.style.setProperty('--k', TS); $('fsSel').value = String(TS); };
+applyTS();
+$('fsSel').onchange = e => { TS = Number(e.target.value); try { localStorage.setItem('moyougae.fs', TS); } catch (err) {} applyTS(); render(false); };
+const sizeText = i => i.t === 'f' ? `${i.w}×${i.d} 高さ${i.h}` : `幅${i.w} 高さ${i.h}`;
+
+const P = () => state.plans[state.cur];
+const item = id => P().items.find(i => i.id === id);
+const uid = () => Math.random().toString(36).slice(2, 9);
+const save = () => {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); saveFailed = false; } catch (e) { saveFailed = true; }
+};
+const snapshot = () => { hist.push(JSON.stringify(state)); if (hist.length > 100) hist.shift(); };
+function mut(fn, panel = true) { snapshot(); fn(); save(); render(panel); }
+function undo() {
+  if (!hist.length || drag) return;
+  state = JSON.parse(hist.pop());
+  if (sel && !item(sel)) sel = null;
+  save(); render(true);
+}
+const wallLen = (wall, room) => (wall === 'top' || wall === 'bottom') ? room.w : room.h;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------- 描画 ----------
+function render(panel) {
+  drawPlan();
+  drawWarn();
+  if (panel) { drawSel(); drawPlans(); }
+  drawList();
+  $('undo').disabled = !hist.length;
+}
+
+function drawPlan() {
+  const p = P(), W = p.room.w, H = p.room.h, m = Math.max(W, H) * 0.09, fs = Math.max(W, H) / 34;
+  svg.setAttribute('viewBox', `${-m} ${-m} ${W + 2 * m} ${H + 2 * m}`);
+  svg.style.aspectRatio = `${W + 2 * m} / ${H + 2 * m}`;
+  const { bad } = G.issues(p);
+  // 選んだ色が濃いときは文字を白にする（明るさの目安で判定）
+  const dark = c => c && (parseInt(c.slice(1, 3), 16) * 299 + parseInt(c.slice(3, 5), 16) * 587 + parseInt(c.slice(5, 7), 16) * 114) / 1000 < 140;
+  const cls = it => `it${bad.has(it.id) ? ' bad' : ''}${it.id === sel ? ' sel' : ''}${dark(it.col) ? ' dark' : ''}`;
+  let s = `<defs><pattern id="g10" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" class="g1"/></pattern>
+    <pattern id="g50" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="url(#g10)"/><path d="M50 0H0V50" class="g2"/></pattern></defs>
+    <rect id="floor" x="0" y="0" width="${W}" height="${H}" fill="url(#g50)"/>
+    <rect class="wall" x="-3" y="-3" width="${W + 6}" height="${H + 6}"/>
+    <text class="dim" x="${W / 2}" y="${-m / 2}" font-size="${fs * Math.min(TS, 1.3)}" text-anchor="middle" dominant-baseline="middle">${W} cm</text>
+    <text class="dim" x="${-m / 2}" y="${H / 2}" font-size="${fs * Math.min(TS, 1.3)}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 ${-m / 2} ${H / 2})">${H} cm</text>`;
+  // 家具を先に、ドア・窓を上に重ねる（壁の上の部品をつかみやすくする）
+  for (const it of p.items.filter(i => i.t === 'f')) {
+    const r = G.fp(it), z = G.front(it), q = (it.rot / 90) % 4;
+    const fl = [[r.x, r.y + r.h, r.x + r.w, r.y + r.h], [r.x, r.y, r.x, r.y + r.h], [r.x, r.y, r.x + r.w, r.y], [r.x + r.w, r.y, r.x + r.w, r.y + r.h]][q];
+    const t = fs * TS * (Math.min(r.w, r.h) < 45 ? 0.75 : 1);
+    s += `<g class="${cls(it)}" data-id="${it.id}">
+      ${z ? `<rect class="zone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>` : ''}
+      <rect class="body" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="1.5"${it.col ? ` style="fill:${it.col}"` : ''}/>
+      <line class="front" x1="${fl[0]}" y1="${fl[1]}" x2="${fl[2]}" y2="${fl[3]}"/>
+      <text x="${r.x + r.w / 2}" y="${r.y + r.h / 2 - t * 0.6}" font-size="${t}">${it.lock ? '🔒' : ''}${esc(it.name)}</text>
+      <text x="${r.x + r.w / 2}" y="${r.y + r.h / 2 + t * 0.6}" font-size="${t * 0.85}" opacity=".85">${it.w}×${it.d} 高さ${it.h}</text></g>`;
+  }
+  for (const it of p.items.filter(i => i.t !== 'f')) {
+    if (it.t === 'door' && it.kind === 'slide') {
+      // 引き戸：壁の内側に戸を描き、戸が引き込まれる側を点線で示す。前 50cm は空けておく範囲
+      const d = G.door(it, p.room), z = G.strip(it, p.room, G.SLIDE_CLEAR), [nx, ny] = d.n, o = 4;
+      const sgn = it.hinge === 'b' ? 1 : -1, hz = G.horiz(it.wall), ux = hz ? sgn * it.w : 0, uy = hz ? 0 : sgn * it.w;
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <rect class="slidezone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>
+        <line class="doorgap" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <line class="slidepanel" x1="${d.a[0] + nx * o}" y1="${d.a[1] + ny * o}" x2="${d.b[0] + nx * o}" y2="${d.b[1] + ny * o}"/>
+        <line class="doorarc" x1="${d.a[0] + nx * o + ux}" y1="${d.a[1] + ny * o + uy}" x2="${d.b[0] + nx * o + ux}" y2="${d.b[1] + ny * o + uy}"/>
+        <line class="hitline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/></g>`;
+    } else if (it.t === 'door') {
+      const d = G.door(it, p.room), [hx, hy] = d.hinge, [lx, ly] = d.leaf, [tx, ty] = d.tip;
+      const sweep = (lx - hx) * (ty - hy) - (ly - hy) * (tx - hx) > 0 ? 1 : 0;
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <path class="doorarea" d="M${hx} ${hy}L${lx} ${ly}A${d.r} ${d.r} 0 0 ${sweep} ${tx} ${ty}Z"/>
+        <line class="doorgap" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <line class="doorleaf" x1="${hx}" y1="${hy}" x2="${lx}" y2="${ly}"/>
+        <path class="doorarc" d="M${lx} ${ly}A${d.r} ${d.r} 0 0 ${sweep} ${tx} ${ty}"/>
+        <line class="hitline" x1="${hx}" y1="${hy}" x2="${lx}" y2="${ly}"/>
+        <line class="hitline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/></g>`;
+    } else {
+      const d = G.door(it, p.room), horiz = it.wall === 'top' || it.wall === 'bottom';
+      // つかむ範囲は壁の外側に寄せる（窓の下に置いた机をつかめるように、内側は 3cm だけ）
+      const o = { top: -15, bottom: -3, left: -15, right: -3 }[it.wall];
+      const hx = horiz ? d.a[0] : d.a[0] + o, hy = horiz ? d.a[1] + o : d.a[1];
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <line class="winline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <rect class="hit" x="${hx}" y="${hy}" width="${horiz ? it.w : 18}" height="${horiz ? 18 : it.w}"/></g>`;
+    }
+  }
+  // 選んだ家具から壁・他の家具までの距離
+  const cur = sel && item(sel);
+  if (cur && cur.t === 'f') {
+    const r = G.fp(cur), others = p.items.filter(i => i.t === 'f' && i !== cur).map(G.fp), g = G.gaps(r, others, p.room);
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    const segs = [['left', r.x, cy, r.x - g.left, cy], ['right', r.x + r.w, cy, r.x + r.w + g.right, cy],
+                  ['up', cx, r.y, cx, r.y - g.up], ['down', cx, r.y + r.h, cx, r.y + r.h + g.down]];
+    for (const [k, x1, y1, x2, y2] of segs) {
+      const v = Math.round(g[k]); if (v <= 0) continue;
+      const n = v < NARROW ? ' narrow' : '';
+      s += `<line class="gap${n}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-start="none"/>
+        <text class="gaptxt${n}" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2}" font-size="${fs * 0.9 * TS}">${v}</text>`;
+    }
+  }
+  svg.innerHTML = s;
+}
+
+function drawWarn() {
+  const { out } = G.issues(P()), ul = $('warn');
+  if (saveFailed) out.unshift('このブラウザに保存できませんでした。「ファイルに書き出す」で残してください');
+  ul.className = out.length ? '' : 'ok';
+  ul.innerHTML = out.length ? out.map(t => `<li>${esc(t)}</li>`).join('') : '<li>問題は見つかりません</li>';
+}
+
+const itemName = i => i.t === 'f' ? i.name : i.t === 'win' ? '窓' : i.kind === 'slide' ? '引き戸' : '開き戸';
+function drawList() {
+  const { bad } = G.issues(P()), its = P().items;
+  $('list').innerHTML = its.length ? its.map(i => `<button data-id="${i.id}" class="${i.id === sel ? 'on' : ''}${bad.has(i.id) ? ' ng' : ''}">${i.lock ? '🔒' : ''}${esc(itemName(i))} <small>${sizeText(i)}</small></button>`).join('')
+    : '<p class="hint">まだ何もありません。</p>';
+}
+$('list').onclick = e => { const id = e.target.dataset.id; if (id) { sel = id; render(true); } };
+function drawPlans() {
+  $('planSel').innerHTML = state.plans.map((p, i) => `<option value="${i}"${i === state.cur ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+  $('planDel').disabled = state.plans.length < 2;
+  const r = P().room, a = G.area(r);
+  $('roomW').value = r.w; $('roomH').value = r.h; $('roomT').value = r.ht;
+  $('area').textContent = `約 ${a.jo.toFixed(1)} 畳（${a.m2.toFixed(1)}㎡）。`;
+}
+
+const field = (k, label, v, attrs = 'type="number" inputmode="numeric" step="1"') =>
+  `<label>${label}<input data-k="${k}" ${attrs} value="${esc(v)}"></label>`;
+const wallSel = v => `<label>付ける壁<select data-k="wall">${Object.entries(WALLS).map(([k, n]) =>
+  `<option value="${k}"${k === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
+
+const lockBtn = it => `<button data-a="lock">${it.lock ? '🔒 ロックを外す' : '位置をロック'}</button>`;
+function drawSel() {
+  const it = sel && item(sel), el = $('sel');
+  if (!it) { el.innerHTML = '<p class="hint">図の中の家具・ドア・窓をタップすると、ここで寸法を変えられます。</p>'; return; }
+  if (it.t === 'f') {
+    el.innerHTML = `<div class="row">${field('name', '名前', it.name, 'type="text"')}</div>
+      <div class="row">${field('w', '幅（cm）', it.w)}${field('d', '奥行き（cm）', it.d)}</div>
+      <div class="row">${field('x', '左の壁から（cm）', it.x)}${field('y', '上の壁から（cm）', it.y)}</div>
+      <div class="row">${field('h', '高さ（cm）', it.h)}${field('c', '前の空き（cm）', it.c || 0)}</div>
+      <div class="row"><label>色<input data-k="col" type="color" value="${it.col || '#e9dcc3'}"></label></div>
+      <p class="hint">前の空きは、引き出しや扉を開けるのに要る奥行きです。太い線の側が前です。</p>
+      <div class="row">${lockBtn(it)}<button data-a="rot">90° 回す</button><button data-a="dup">複製</button><button data-a="del">削除</button></div>`;
+  } else {
+    el.innerHTML = `<div class="row">${wallSel(it.wall)}</div>
+      ${it.t === 'door' ? `<div class="row"><label>種類<select data-k="kind"><option value="swing"${it.kind !== 'slide' ? ' selected' : ''}>開き戸</option><option value="slide"${it.kind === 'slide' ? ' selected' : ''}>引き戸</option></select></label></div>` : ''}
+      <div class="row">${field('pos', '壁の端から（cm）', it.pos)}${field('w', '幅（cm）', it.w)}</div>
+      <div class="row">${it.t === 'win' ? field('sill', '床から下端まで（cm）', it.sill) : ''}${field('h', '高さ（cm）', it.h)}</div>
+      <p class="hint">「壁の端」は上下の壁なら左端、左右の壁なら上端です。${it.t === 'win' ? '窓の下端より高い家具を窓の前に置くと警告します。' : ''}</p>
+      <div class="row">${it.t === 'door' ? `<button data-a="flip">${it.kind === 'slide' ? '引く向きを反転' : '開く向きを反転'}</button>` : ''}<button data-a="del">削除</button>${lockBtn(it)}</div>`;
+  }
+  if (it.lock) {
+    el.querySelectorAll('[data-k="x"],[data-k="y"],[data-k="pos"],[data-k="wall"],[data-a="rot"],[data-a="del"]').forEach(x => { x.disabled = true; });
+    el.insertAdjacentHTML('beforeend', '<p class="hint">ロック中は動かせません（寸法や名前は変えられます）。</p>');
+  }
+}
+
+// ---------- 操作 ----------
+function setRot(it, rot) {
+  const r = G.fp(it), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  it.rot = rot % 360;
+  const n = G.fp(it);
+  it.x = Math.round(cx - n.w / 2); it.y = Math.round(cy - n.h / 2);
+}
+function fitOnWall(it) { it.w = clamp(it.w, 10, wallLen(it.wall, P().room)); it.pos = clamp(it.pos, 0, wallLen(it.wall, P().room) - it.w); }
+
+$('sel').addEventListener('change', e => {
+  const k = e.target.dataset.k, it = item(sel); if (!k || !it) return;
+  const raw = e.target.value;
+  if (k === 'name' || k === 'wall' || k === 'kind' || k === 'col') {
+    mut(() => { it[k] = k === 'name' ? (raw.trim() || '家具') : raw; if (k === 'wall') fitOnWall(it); }, k !== 'name' && k !== 'col');
+    return;
+  }
+  const v = Math.round(e.target.valueAsNumber);
+  if (raw.trim() === '' || !isFinite(v)) { drawSel(); return; } // 空欄は 0 にせず元の値に戻す
+  mut(() => {
+    if (k === 'w' || k === 'd') it[k] = Math.max(1, v);
+    else if (k === 'c' || k === 'sill') it[k] = Math.max(0, v);
+    else if (k === 'h') it.h = Math.max(1, v);
+    else it[k] = v;
+    if (it.t !== 'f') fitOnWall(it);
+  }, true);
+});
+$('sel').addEventListener('click', e => {
+  const a = e.target.dataset.a, it = item(sel); if (!a || !it) return;
+  if (a === 'lock') { mut(() => { if (it.lock) delete it.lock; else it.lock = true; }); return; }
+  if (it.lock && (a === 'rot' || a === 'del')) return;
+  if (a === 'rot') mut(() => setRot(it, it.rot + 90));
+  if (a === 'flip') mut(() => { it.hinge = it.hinge === 'b' ? 'a' : 'b'; }, false);
+  if (a === 'del') mut(() => { P().items = P().items.filter(i => i !== it); sel = null; });
+  if (a === 'dup') mut(() => { const c = { ...it, id: uid(), x: it.x + 10, y: it.y + 10 }; delete c.lock; P().items.push(c); sel = c.id; });
+});
+
+$('preset').innerHTML = PRESETS.map(([n, w, d, h], i) => `<option value="${i}">${n}（${w}×${d}×${h}）</option>`).join('');
+$('addF').onclick = () => mut(() => {
+  const [name, w, d, h, c] = PRESETS[$('preset').value], room = P().room;
+  const it = { id: uid(), t: 'f', name, w, d, h: name === '柱・出っ張り' ? room.ht : h, c, rot: 0, x: Math.round((room.w - w) / 2 / 5) * 5, y: Math.round((room.h - d) / 2 / 5) * 5 };
+  P().items.push(it); sel = it.id;
+});
+const addOn = it => mut(() => { it.id = uid(); fitOnWall(it); P().items.push(it); sel = it.id; });
+$('addDoor').onclick = () => addOn({ t: 'door', kind: 'swing', wall: 'bottom', pos: 10, w: 75, h: 200, hinge: 'a' });
+$('addSlide').onclick = () => addOn({ t: 'door', kind: 'slide', wall: 'bottom', pos: 90, w: 80, h: 200, hinge: 'a' });
+$('addWin').onclick = () => addOn({ t: 'win', wall: 'top', pos: 40, w: 120, sill: 90, h: 110 });
+
+function setRoom() {
+  const w = Math.round(Number($('roomW').value)), h = Math.round(Number($('roomH').value)), ht = Math.round(Number($('roomT').value));
+  if (!(w >= 50 && h >= 50 && ht >= 100)) { drawPlans(); return; }
+  mut(() => { P().room = { w, h, ht }; P().items.filter(i => i.t !== 'f').forEach(fitOnWall); });
+}
+$('roomW').onchange = setRoom; $('roomH').onchange = setRoom; $('roomT').onchange = setRoom;
+
+// 案を切り替えたら履歴を空にする（別の案の変更を戻して画面が飛ぶのを防ぐ）
+$('planSel').onchange = e => { state.cur = Number(e.target.value); sel = null; hist = []; save(); render(true); };
+$('planNew').onclick = () => mut(() => {
+  const p = newPlan(`案${String.fromCharCode(65 + state.plans.length % 26)}`); p.room = { ...P().room };
+  state.plans.push(p); state.cur = state.plans.length - 1; sel = null;
+});
+$('planCopy').onclick = () => mut(() => {
+  const p = JSON.parse(JSON.stringify(P())); p.name += ' のコピー';
+  state.plans.push(p); state.cur = state.plans.length - 1; sel = null;
+});
+$('planRen').onclick = () => { const n = prompt('案の名前', P().name); if (n && n.trim()) mut(() => { P().name = n.trim(); }); };
+$('planDel').onclick = () => {
+  if (state.plans.length < 2 || !confirm(`「${P().name}」を削除しますか？（「元に戻す」で戻せます）`)) return;
+  mut(() => { state.plans.splice(state.cur, 1); state.cur = Math.max(0, state.cur - 1); sel = null; });
+};
+$('undo').onclick = undo;
+$('show3d').onclick = () => View3D.open(P());
+
+// 平面図を PNG で保存：CSS の色は書き出すと消えるので、計算済みの色を各要素に直接書き込んでから描く
+$('png').onclick = () => {
+  const props = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'font-weight', 'text-anchor', 'dominant-baseline', 'paint-order'];
+  const src = [svg, ...svg.querySelectorAll('*')], c = svg.cloneNode(true), dst = [c, ...c.querySelectorAll('*')];
+  src.forEach((el, i) => { const cs = getComputedStyle(el); dst[i].setAttribute('style', props.map(k => `${k}:${cs.getPropertyValue(k)}`).join(';')); });
+  c.querySelectorAll('.hit,.hitline').forEach(el => el.remove());
+  const vb = svg.viewBox.baseVal, scale = 1600 / Math.max(vb.width, vb.height);
+  c.setAttribute('width', vb.width * scale); c.setAttribute('height', vb.height * scale);
+  c.setAttribute('font-family', getComputedStyle(document.body).fontFamily);
+  const img = new Image(), fail = () => alert('画像を作れませんでした。別のブラウザで試してください');
+  img.onerror = fail;
+  img.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const g = cv.getContext('2d'); g.fillStyle = getComputedStyle(document.body).backgroundColor; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0);
+    cv.toBlob(b => {
+      if (!b) return fail();
+      // iOS Safari はページに付いていないリンクの click を無視することがある
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${P().name}.png`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(c));
+};
+
+$('exp').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }));
+  a.download = 'moyougae.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('imp').onclick = () => $('impFile').click();
+$('impFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let s; try { s = G.clean(JSON.parse(await f.text())); } catch (err) { s = null; }
+  if (!s) { alert('このファイルは読み込めません（模様替えで書き出したファイルを選んでください）'); return; }
+  // 今の案は消さず、読み込んだ案を後ろに足す
+  mut(() => { state.plans.push(...s.plans); state.cur = state.plans.length - s.plans.length; sel = null; });
+};
+
+// ドラッグ（マウス・指どちらも pointer イベントで扱う）
+function pt(e) { const m = svg.getScreenCTM().inverse(); return new DOMPoint(e.clientX, e.clientY).matrixTransform(m); }
+svg.addEventListener('pointerdown', e => {
+  if (drag) return; // 2 本目の指は無視する
+  const g = e.target.closest('[data-id]');
+  if (!g) { if (sel) { sel = null; render(true); } return; }
+  const it = item(g.dataset.id), q = pt(e);
+  if (sel !== it.id) { sel = it.id; render(true); }
+  if (it.lock) return; // ロック中は選ぶだけで動かさない
+  drag = { it, q, cx: e.clientX, cy: e.clientY, pid: e.pointerId, x: it.x, y: it.y, pos: it.pos, moved: false, before: JSON.stringify(state) };
+  svg.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+svg.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const q = pt(e), dx = q.x - drag.q.x, dy = q.y - drag.q.y, it = drag.it, p = P();
+  // タップの指のぶれで動かないよう、画面上で 8px 動くまではドラッグにしない
+  if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 8) return;
+  drag.moved = true;
+  const mag = $('magnet').checked && !e.shiftKey, th = Math.max(p.room.w, p.room.h) / 40;
+  if (it.t === 'f') {
+    const r = G.fp(it), os = p.items.filter(i => i.t === 'f' && i !== it).map(G.fp);
+    const cx = [0, p.room.w - r.w, ...os.flatMap(o => [o.x - r.w, o.x + o.w, o.x, o.x + o.w - r.w])];
+    const cy = [0, p.room.h - r.h, ...os.flatMap(o => [o.y - r.h, o.y + o.h, o.y, o.y + o.h - r.h])];
+    it.x = mag ? G.snap(drag.x + dx, cx, th) : Math.round(drag.x + dx);
+    it.y = mag ? G.snap(drag.y + dy, cy, th) : Math.round(drag.y + dy);
+    // 図の外へ出し切ってつかめなくなるのを防ぐ（少なくとも 20cm は部屋に残す）
+    it.x = clamp(it.x, 20 - r.w, p.room.w - 20); it.y = clamp(it.y, 20 - r.h, p.room.h - 20);
+  } else {
+    const horiz = it.wall === 'top' || it.wall === 'bottom', len = wallLen(it.wall, p.room);
+    const v = drag.pos + (horiz ? dx : dy);
+    it.pos = clamp(mag ? G.snap(v, [0, len - it.w], th) : Math.round(v), 0, len - it.w);
+  }
+  drawPlan(); drawWarn();
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (drag.moved && JSON.stringify(state) !== drag.before) { hist.push(drag.before); if (hist.length > 100) hist.shift(); save(); render(true); }
+  drag = null;
+}
+svg.addEventListener('pointerup', endDrag);
+svg.addEventListener('pointercancel', endDrag);
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches?.('input,select,textarea') || document.querySelector('.v3d')) return; // 3D 表示中は平面図を動かさない
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  const it = sel && item(sel); if (!it || it.lock) return;
+  const step = e.shiftKey ? 10 : 1, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (mv) {
+    e.preventDefault();
+    mut(() => {
+      if (it.t === 'f') { it.x += mv[0] * step; it.y += mv[1] * step; }
+      else { const horiz = it.wall === 'top' || it.wall === 'bottom'; it.pos += (horiz ? mv[0] : mv[1]) * step; fitOnWall(it); }
+    });
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault(); mut(() => { P().items = P().items.filter(i => i !== it); sel = null; });
+  } else if (e.key.toLowerCase() === 'r' && it.t === 'f') {
+    mut(() => setRot(it, it.rot + 90));
+  }
+});
+
+try { render(true); } catch (e) {
+  // 保存データが原因で描けないときは、初期状態で開き直す（データはファイルに逃がせないので注意を出す）
+  state = { plans: [newPlan('案A')], cur: 0 }; hist = []; render(true);
+  alert('保存されていた案を読み込めなかったため、新しい案で開きました');
+}
+</script>
+</body>
+</html>
