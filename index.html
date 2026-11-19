@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f9f9f9">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1c1e">
+<meta name="color-scheme" content="light dark">
+<title>模様替え</title>
+<style>
+:root{
+  --k:1;
+  --bg:#f2f2f7; --surface:#fff; --fill:#e5e5ea; --press:#d1d1d6;
+  --ink:#000; --sub:#6c6c70; --sep:rgba(60,60,67,.29); --bar:rgba(249,249,249,.94);
+  --tint:#0a64d8; --tint-soft:rgba(10,100,216,.12); --red:#d70015; --red-soft:rgba(215,0,21,.1); --bad-halo:#fbe3e5; --green:#248a3d;
+  --floor:#fff; --grid1:#ececf0; --grid2:#d8d8de; --wall:#1c1c1e;
+  --furn:#e5e5ea; --furn-s:#8e8e93; --door:#8e8e93; --win:#32ade6;
+  --shadow:0 -6px 24px rgba(0,0,0,.12);
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000; --surface:#1c1c1e; --fill:#2c2c2e; --press:#3a3a3c;
+    --ink:#fff; --sub:#98989f; --sep:rgba(84,84,88,.6); --bar:rgba(28,28,30,.94);
+    --tint:#4da3ff; --tint-soft:rgba(77,163,255,.2); --red:#ff453a; --red-soft:rgba(255,69,58,.18); --bad-halo:#3a2224; --green:#30d158;
+    --floor:#1c1c1e; --grid1:#26262a; --grid2:#36363b; --wall:#e5e5ea;
+    --furn:#3a3a3c; --furn-s:#8e8e93; --door:#8e8e93; --win:#64d2ff;
+    --shadow:0 -6px 24px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
+  font:calc(17px * var(--k))/1.35 system-ui,-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif}
+::selection{background:var(--tint-soft)}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button:disabled{opacity:.35;cursor:default}
+input,select{font:inherit;font-size:max(16px, calc(17px * var(--k)));color:var(--ink);caret-color:var(--tint);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--tint);outline-offset:2px;border-radius:6px}
+.ico{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* 画面の骨組み：上のバー・平面図・（シート）・下のツールバー */
+.app{display:grid;height:100dvh;grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-columns:minmax(0,1fr)}
+.nav{grid-row:1;grid-column:1/-1;display:flex;align-items:center;gap:8px;min-height:44px;
+  padding:env(safe-area-inset-top,0px) max(8px, env(safe-area-inset-right,0px)) 0 max(8px, env(safe-area-inset-left,0px));
+  background:var(--bar);border-bottom:.5px solid var(--sep);backdrop-filter:saturate(1.8) blur(20px);-webkit-backdrop-filter:saturate(1.8) blur(20px);z-index:3}
+.plan-btn{display:flex;align-items:center;gap:2px;font-weight:600;padding:8px;min-width:0;border-radius:8px}
+.plan-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52vw}
+.plan-btn .ico{width:18px;height:18px;stroke-width:2.2}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:4px}
+.nav,.toolbar{touch-action:none}
+.sheet{touch-action:pan-y}
+.txt-btn{color:var(--tint);min-height:44px;padding:8px 12px;border-radius:8px;font-weight:500}
+.icon-btn{color:var(--tint);width:44px;height:44px;display:grid;place-items:center;border-radius:10px}
+.txt-btn:active,.icon-btn:active,.plan-btn:active{opacity:.45}
+
+.stage{grid-row:2;position:relative;background:var(--bg);overflow:hidden}
+#plan{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+.fab{position:absolute;right:max(12px, env(safe-area-inset-right,0px));bottom:12px;width:44px;height:44px;border-radius:22px;
+  display:grid;place-items:center;background:var(--surface);color:var(--tint);box-shadow:0 2px 10px rgba(0,0,0,.16)}
+.fab:active{background:var(--press)}
+
+.toolbar{grid-row:4;grid-column:1;display:grid;grid-template-columns:repeat(5,1fr);
+  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+  background:var(--bar);border-top:.5px solid var(--sep);backdrop-filter:saturate(1.8) blur(20px);-webkit-backdrop-filter:saturate(1.8) blur(20px)}
+.tb{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:49px;padding:4px 0;
+  color:var(--sub);font-size:max(11px, calc(10px * var(--k)));font-weight:500}
+.tb.on{color:var(--tint)}
+.tb:active{opacity:.45}
+.badge{position:absolute;top:3px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+  background:var(--red);color:#fff;font-size:12px;font-weight:600;line-height:18px;text-align:center;font-variant-numeric:tabular-nums}
+.badge:empty{display:none}
+
+/* シート：スマホでは図の下に差し込み、PC では右の欄 */
+.sheet{grid-row:3;grid-column:1;display:none;flex-direction:column;max-height:40dvh;min-height:0;background:var(--bg);
+  border-radius:12px 12px 0 0;box-shadow:var(--shadow);z-index:2;animation:rise .28s var(--ease)}
+.app.sheet-open .sheet{display:flex}
+.sheet.tall{max-height:78dvh}
+.grab{justify-self:center;grid-column:1/-1;width:60px;height:22px;margin:-6px 0 -4px;display:grid;place-items:center}
+.grab::before{content:"";width:36px;height:5px;border-radius:3px;background:var(--press)}
+@keyframes rise{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+.sheet-head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:10px 16px 8px}
+.sheet-head h2{margin:0;font-size:calc(20px * var(--k));font-weight:700;letter-spacing:-.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-head p{grid-column:1/-1;margin:2px 0 0;color:var(--sub);font-size:calc(15px * var(--k));font-variant-numeric:tabular-nums}
+.sheet-head .done{grid-row:2;grid-column:2;color:var(--tint);font-weight:600;padding:6px 4px}
+.sheet-head .done:active{opacity:.45}
+.sheet-body{overflow-y:auto;overscroll-behavior:contain;padding:0 16px 20px}
+
+/* iOS の設定アプリのようなグループのリスト */
+.group-title{margin:18px 16px 6px;color:var(--sub);font-size:calc(13px * var(--k))}
+.group{background:var(--surface);border-radius:10px;overflow:hidden}
+.cell{display:flex;align-items:center;gap:12px;min-height:44px;padding:6px 16px;position:relative;width:100%;text-align:left}
+.cell + .cell::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+button.cell:active,label.cell:active{background:var(--press)}
+.cell > span{flex:1;min-width:0}
+.cell small{display:block;color:var(--sub);font-size:calc(14px * var(--k));font-variant-numeric:tabular-nums}
+.cell input:not([type=color]):not([type=checkbox]),.cell select{flex:0 1 9em;min-width:0;border:0;background:none;text-align:right;color:var(--sub);padding:6px 0}
+.cell input:focus{color:var(--ink);outline:none}
+.cell input:disabled,.cell select:disabled{opacity:.4}
+.cell em{font-style:normal;color:var(--sub);font-size:calc(15px * var(--k))}
+.cell input[type=color]{width:44px;height:30px;border:0;padding:0;background:none;border-radius:6px}
+.cell .ico{color:var(--sub)}
+.cell.danger{color:var(--red)}
+.cell.action{color:var(--tint)}
+.cell .check{color:var(--tint)}
+.cell small.why{color:var(--red)}
+.cell .dot{width:8px;height:8px;border-radius:4px;background:var(--red);flex:none}
+.foot{margin:6px 16px 0;color:var(--sub);font-size:calc(13px * var(--k));line-height:1.45}
+.empty{display:flex;align-items:center;gap:10px;padding:18px 16px;color:var(--green);font-weight:500}
+
+/* iOS の切り替えスイッチ */
+.switch{appearance:none;-webkit-appearance:none;width:51px;height:31px;border-radius:16px;background:var(--fill);position:relative;flex:none;margin:0;
+  transition:background .2s var(--ease);cursor:pointer}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .2s var(--ease)}
+.switch:checked{background:#34c759}
+.switch:checked::after{transform:translateX(20px)}
+
+/* セグメント */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;padding:2px;margin:6px 0;background:var(--fill);border-radius:9px}
+.seg button{padding:6px 4px;border-radius:7px;font-size:calc(14px * var(--k));font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 1px rgba(0,0,0,.04);font-weight:600}
+
+/* 選んだものの操作（回す・複製・ロック・削除） */
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.act .ico{width:20px;height:20px}
+.act{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:6px 4px;border-radius:10px;background:var(--surface);color:var(--tint);font-size:calc(13px * var(--k));font-weight:500}
+.act.danger{color:var(--red)}
+.act.on{background:var(--tint-soft)}
+.act:active{background:var(--press)}
+
+/* 追加：家具の雛形を同じ大きさのマスで並べる */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px 10px;border-radius:12px;background:var(--surface);text-align:center}
+.tile:active{background:var(--press)}
+.tile svg{width:56px;height:44px}
+.tile svg rect{fill:var(--furn);stroke:var(--furn-s);stroke-width:1.5}
+.tile b{font-weight:500;font-size:calc(14px * var(--k));line-height:1.25}
+.tile small{color:var(--sub);font-size:calc(12px * var(--k));font-variant-numeric:tabular-nums}
+
+@media (hover:hover) and (pointer:fine){
+  button.cell:hover,label.cell:hover,.tile:hover,.act:hover{background:var(--fill)}
+  .txt-btn:hover,.icon-btn:hover,.plan-btn:hover{background:var(--fill)}
+  .fab:hover{background:var(--fill)}
+}
+
+/* PC：右に 360px の欄を出しっぱなしにする */
+@media (min-width:720px){
+  .app{grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto minmax(0,1fr) auto}
+  .sheet,.app.sheet-open .sheet{display:flex;grid-column:2;grid-row:2/4;max-height:none !important;border-radius:0;box-shadow:none;border-left:.5px solid var(--sep);animation:none}
+  .toolbar{grid-row:3;grid-template-columns:repeat(5,minmax(0,96px));justify-content:center}
+  .grab{display:none}
+}
+
+/* 平面図（SVG） */
+.g1{fill:none;stroke:var(--grid1);stroke-width:.6}
+.g2{fill:none;stroke:var(--grid2);stroke-width:.9}
+.floor{fill:var(--floor)}
+.wall{fill:none;stroke:var(--wall);stroke-width:6}
+.dim{fill:var(--sub);font-variant-numeric:tabular-nums}
+.it rect.body{fill:var(--furn);stroke:var(--furn-s);stroke-width:1.2}
+.it .front{stroke:var(--furn-s);stroke-width:4}
+.it .zone{fill:var(--furn-s);fill-opacity:.07;stroke:var(--furn-s);stroke-dasharray:4 3;stroke-width:.8;pointer-events:none}
+.it text{fill:var(--ink);text-anchor:middle;dominant-baseline:middle;pointer-events:none;font-variant-numeric:tabular-nums;paint-order:stroke;stroke:var(--furn);stroke-width:3px;stroke-linejoin:round}
+.it.bad text{stroke:var(--bad-halo)}
+.it.dark text{stroke:none}
+.it .size{fill:var(--sub)}
+.it .lk{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;pointer-events:none}
+.it.dark text,.it.dark .size{fill:#fff}
+.it.dark .lk{stroke:#fff}
+.it.bad rect.body{fill:var(--red-soft);stroke:var(--red);stroke-width:3.5}
+.it.bad .zone{stroke:var(--red);fill:var(--red)}
+.it.sel rect.body{stroke:var(--tint);stroke-width:3}
+.doorgap{stroke:var(--floor);stroke-width:8}
+.doorarea{fill:var(--door);fill-opacity:.1;pointer-events:none}
+.doorleaf{stroke:var(--door);stroke-width:2;fill:none}
+.doorarc{stroke:var(--door);stroke-width:1;stroke-dasharray:3 3;fill:none;pointer-events:none}
+.it.bad .doorarea{fill:var(--red);fill-opacity:.18}
+.slidepanel{stroke:var(--door);stroke-width:4}
+.slidezone{fill:var(--door);fill-opacity:.07;stroke:var(--door);stroke-dasharray:3 3;stroke-width:.8;pointer-events:none}
+.it.bad .slidezone{fill:var(--red);stroke:var(--red);fill-opacity:.15}
+.winline{stroke:var(--win);stroke-width:6}
+.it.sel .winline,.it.sel .doorleaf,.it.sel .slidepanel{stroke:var(--tint)}
+.hit{fill:transparent;stroke:transparent}
+.hitline{stroke:transparent;stroke-width:20}
+.gap{stroke:var(--tint);stroke-width:1}
+.gap.narrow{stroke:var(--red)}
+.gaptxt{fill:var(--tint);font-weight:600;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--floor);stroke-width:4px;font-variant-numeric:tabular-nums}
+.gaptxt.narrow{fill:var(--red)}
+
+/* 3D 表示 */
+.v3d{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;flex-direction:column}
+.v3d-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:calc(6px + env(safe-area-inset-top,0px)) 12px 8px;background:var(--bar);border-bottom:.5px solid var(--sep)}
+.v3d-bar button{padding:7px 12px;border-radius:8px;background:var(--fill);font-size:calc(15px * var(--k));font-weight:500}
+.v3d-bar button.main{background:var(--tint);color:#fff}
+.v3d-bar button:active{opacity:.6}
+.v3d-bar .hint{margin:0;color:var(--sub);font-size:calc(12px * var(--k));flex-basis:100%}
+.v3d canvas{display:block;touch-action:none}
+.v3d-msg{padding:24px 16px;color:var(--sub)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{.nav,.toolbar,.sheet,.fab{display:none}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="nav">
+    <button class="plan-btn" id="planBtn" aria-label="案を切り替える"><span id="planName"></span><svg class="ico" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></button>
+    <div class="nav-right">
+      <button class="txt-btn" id="show3d">3D</button>
+      <button class="icon-btn" id="moreBtn" aria-label="その他"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.6"/></svg></button>
+    </div>
+  </header>
+  <main class="stage" id="stage">
+    <svg id="plan" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="部屋の平面図"></svg>
+    <button class="fab" id="fitBtn" aria-label="部屋全体を表示"><svg class="ico" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></svg></button>
+  </main>
+  <section class="sheet" id="sheet" aria-labelledby="sheetTitle">
+    <div class="sheet-head"><button class="grab" id="grab" aria-label="シートの大きさを切り替える"></button><h2 id="sheetTitle"></h2><button class="done" id="sheetDone">完了</button><p id="sheetSub" hidden></p></div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </section>
+  <nav class="toolbar" aria-label="道具">
+    <button class="tb" data-sheet="add"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>追加</button>
+    <button class="tb" data-sheet="room"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 14h6v6M14 4v5"/></svg>部屋</button>
+    <button class="tb" data-sheet="warn"><svg class="ico" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>注意<b class="badge" id="badge"></b></button>
+    <button class="tb" data-sheet="list"><svg class="ico" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" /></svg>一覧</button>
+    <button class="tb" id="undo"><svg class="ico" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>元に戻す</button>
+  </nav>
+</div>
+<input type="file" id="impFile" accept=".json,application/json" hidden>
+<script src="geom.js"></script>
+<script src="view3d.js"></script>
+<script>
+// 名前, 幅, 奥行き, 高さ, 前の空き（cm）。よくある大きさの目安
+const PRESETS = [
+  ['シングルベッド', 97, 195, 45, 0], ['セミダブルベッド', 120, 195, 45, 0], ['ダブルベッド', 140, 195, 45, 0],
+  ['二段ベッド', 100, 205, 160, 0], ['机', 100, 60, 72, 0], ['椅子', 45, 50, 80, 0], ['本棚', 80, 30, 180, 0],
+  ['カラーボックス', 42, 29, 88, 0], ['チェスト', 80, 45, 100, 60], ['洋服タンス', 100, 60, 180, 60],
+  ['洋服ラック', 90, 45, 150, 0], ['ソファ', 160, 80, 80, 0], ['テレビ台', 120, 40, 45, 0], ['テレビ', 100, 20, 65, 0],
+  ['ローテーブル', 90, 50, 40, 0], ['ダイニングテーブル', 120, 75, 70, 0], ['こたつ', 105, 75, 40, 0],
+  ['収納ケース', 40, 75, 30, 0], ['冷蔵庫', 60, 65, 170, 60], ['ゲーミングチェア', 70, 70, 130, 0],
+  ['柱・出っ張り', 30, 30, 240, 0], ['自由な家具', 60, 60, 60, 0],
+];
+const OPENINGS = [
+  ['開き戸', { t: 'door', kind: 'swing', wall: 'bottom', pos: 10, w: 75, h: 200, hinge: 'a' }],
+  ['引き戸', { t: 'door', kind: 'slide', wall: 'bottom', pos: 90, w: 80, h: 200, hinge: 'a' }],
+  ['窓', { t: 'win', wall: 'top', pos: 40, w: 120, sill: 90, h: 110 }],
+];
+const WALLS = { top: '上の壁', bottom: '下の壁', left: '左の壁', right: '右の壁' };
+const KEY = 'moyougae.v1', NARROW = 60, SIZES = [[0.8, '小'], [1, '中'], [1.3, '大'], [1.7, '特大']];
+const $ = id => document.getElementById(id);
+const svg = $('plan'), app = $('app');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const newPlan = name => ({ name, room: { w: 270, h: 360, ht: 240 }, items: [] });
+const wide = matchMedia('(min-width: 720px)');
+const ICON = {
+  rot: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  dup: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  unlock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
+  del: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/>',
+  flip: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  ok: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+  file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
+  out: '<path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>',
+  in: '<path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/>',
+  img: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+};
+const ico = (k, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24">${ICON[k]}</svg>`;
+
+let state, sel = null, hist = [], drag = null, sheet = null, view = null, saveFailed = false;
+let userZoomed = false; // 自分で拡大・移動したら true。それまでは枠が変わるたびに部屋全体を収める
+try { state = G.clean(JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
+if (!state) state = { plans: [newPlan('案A')], cur: 0 };
+// 文字の大きさと吸い付きは端末ごとの好みなので、案とは別に保存する
+const pref = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch (e) { return def; } };
+const setPref = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+let TS = SIZES.some(s => s[0] === pref('moyougae.fs', 1)) ? pref('moyougae.fs', 1) : 1;
+let magnet = pref('moyougae.magnet', true) !== false;
+const applyTS = () => document.documentElement.style.setProperty('--k', TS);
+applyTS();
+
+const P = () => state.plans[state.cur];
+const item = id => P().items.find(i => i.id === id);
+const uid = () => Math.random().toString(36).slice(2, 9);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); saveFailed = false; } catch (e) { saveFailed = true; } };
+const snapshot = () => { hist.push(JSON.stringify(state)); if (hist.length > 100) hist.shift(); };
+function mut(fn, panel = true) { snapshot(); fn(); save(); render(panel); }
+function undo() {
+  if (!hist.length || drag) return;
+  state = JSON.parse(hist.pop());
+  if (sel && !item(sel)) select(null); else render(true);
+  save();
+}
+const wallLen = (wall, room) => G.horiz(wall) ? room.w : room.h;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const itemName = i => i.t === 'f' ? i.name : i.t === 'win' ? '窓' : i.kind === 'slide' ? '引き戸' : '開き戸';
+const sizeText = i => i.t === 'f' ? `${i.w}×${i.d}・高さ${i.h}` : `幅${i.w}・高さ${i.h}`;
+
+// ---------- 表示範囲（拡大・移動） ----------
+// view は図の見えている範囲（cm）。縦横比は平面図の枠に合わせるので、画面の 1px が何 cm かは view.w / 枠の幅で決まる
+const box = () => svg.getBoundingClientRect();
+function fitView() {
+  const r = box(), { w: W, h: H } = P().room, m = Math.max(W, H) * 0.1, a = r.height / r.width || 1;
+  const w = Math.max(W + 2 * m, (H + 2 * m) / a);
+  view = { cx: W / 2, cy: H / 2, w };
+  userZoomed = false;
+}
+const viewH = (v = view) => { const r = box(); return v.w * (r.height / r.width || 1); };
+function toWorld(sx, sy, v = view) {
+  const r = box(), u = v.w / r.width;
+  return { x: v.cx - v.w / 2 + (sx - r.left) * u, y: v.cy - viewH(v) / 2 + (sy - r.top) * u };
+}
+function zoomTo(sx, sy, w, anchor) {
+  // anchor（図の上の点）が画面の (sx, sy) に来るように、幅 w で表示する
+  const r = box(), { w: W, h: H } = P().room, max = Math.max(W, H) * 4;
+  w = clamp(w, 40, max); userZoomed = true;
+  const u = w / r.width, h = w * (r.height / r.width);
+  view = { w, cx: anchor.x + w / 2 - (sx - r.left) * u, cy: anchor.y + h / 2 - (sy - r.top) * u };
+}
+let raf = 0;
+const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawPlan(); }); };
+function ensureVisible(id) {
+  const it = item(id); if (!it || !view) return;
+  const r = it.t === 'f' ? G.fp(it) : G.door(it, P().room).sq, h = viewH();
+  const inView = r.x >= view.cx - view.w / 2 && r.x + r.w <= view.cx + view.w / 2 && r.y >= view.cy - h / 2 && r.y + r.h <= view.cy + h / 2;
+  if (!inView) { view.cx = r.x + r.w / 2; view.cy = r.y + r.h / 2; }
+}
+
+// ---------- 描画 ----------
+function render(panel) {
+  drawPlan();
+  const { out } = G.issues(P());
+  $('badge').textContent = out.length ? out.length : '';
+  $('undo').disabled = !hist.length;
+  $('planName').textContent = P().name;
+  if (panel) drawSheet();
+}
+
+function drawPlan(v = view, pxw = box().width, forExport = false) {
+  if (!v) return;
+  const p = P(), W = p.room.w, H = p.room.h, h = forExport ? v.h : viewH(v), u = v.w / (pxw || 1);
+  svg.setAttribute('viewBox', `${v.cx - v.w / 2} ${v.cy - h / 2} ${v.w} ${h}`);
+  // 文字は画面上の大きさを一定に保つ（拡大しても文字だけ大きくならない）
+  const fs = 13 * TS * u, { bad } = G.issues(p), cur = forExport ? null : sel;
+  const dark = c => c && (parseInt(c.slice(1, 3), 16) * 299 + parseInt(c.slice(3, 5), 16) * 587 + parseInt(c.slice(5, 7), 16) * 114) / 1000 < 140;
+  const cls = it => `it${bad.has(it.id) ? ' bad' : ''}${it.id === cur ? ' sel' : ''}${dark(it.col) ? ' dark' : ''}`;
+  let s = `<defs><pattern id="g10" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" class="g1"/></pattern>
+    <pattern id="g50" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="url(#g10)"/><path d="M50 0H0V50" class="g2"/></pattern></defs>
+    <rect class="floor" x="0" y="0" width="${W}" height="${H}"/><rect x="0" y="0" width="${W}" height="${H}" fill="url(#g50)"/>
+    <rect class="wall" x="-3" y="-3" width="${W + 6}" height="${H + 6}"/>
+    <text class="dim" x="${W / 2}" y="${-6 - fs}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle">${W} cm</text>
+    <text class="dim" x="${-6 - fs}" y="${H / 2}" font-size="${fs}" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 ${-6 - fs} ${H / 2})">${H} cm</text>`;
+  for (const it of p.items.filter(i => i.t === 'f')) {
+    const r = G.fp(it), z = G.front(it), q = (it.rot / 90) % 4;
+    const fl = [[r.x, r.y + r.h, r.x + r.w, r.y + r.h], [r.x, r.y, r.x, r.y + r.h], [r.x, r.y, r.x + r.w, r.y], [r.x + r.w, r.y, r.x + r.w, r.y + r.h]][q];
+    const t = fs, sz = `${it.w}×${it.d}・高さ${it.h}`, cy = r.y + r.h / 2;
+    // 寸法の行は家具の中に収まるときだけ出す（全角はおよそ 1 字、半角は 0.6 字の幅として見積もる）
+    const est = [...sz].reduce((a, ch) => a + (ch.charCodeAt(0) > 255 ? 1 : 0.6), 0) * t * 0.85;
+    const showSize = r.h > t * 3.2 && est < r.w * 0.94, ny = showSize ? cy - t * 0.6 : cy;
+    const lk = it.lock ? `<g transform="translate(${r.x + t * 0.35} ${r.y + t * 0.35}) scale(${t / 24})"><rect class="lk" x="5" y="11" width="14" height="9" rx="2"/><path class="lk" d="M8 11V8a4 4 0 0 1 8 0v3"/></g>` : '';
+    s += `<g class="${cls(it)}" data-id="${it.id}">
+      ${z ? `<rect class="zone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>` : ''}
+      <rect class="body" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="1.5"${it.col ? ` style="fill:${it.col}"` : ''}/>
+      <line class="front" x1="${fl[0]}" y1="${fl[1]}" x2="${fl[2]}" y2="${fl[3]}"/>${lk}
+      <text x="${r.x + r.w / 2}" y="${ny}" font-size="${t}" font-weight="600">${esc(it.name)}</text>
+      ${showSize ? `<text class="size" x="${r.x + r.w / 2}" y="${cy + t * 0.65}" font-size="${t * 0.85}">${sz}</text>` : ''}</g>`;
+  }
+  for (const it of p.items.filter(i => i.t !== 'f')) {
+    if (it.t === 'door' && it.kind === 'slide') {
+      // 引き戸：壁の内側に戸を描き、戸が引き込まれる側を点線で示す。前 50cm は空けておく範囲
+      const d = G.door(it, p.room), z = G.strip(it, p.room, G.SLIDE_CLEAR), [nx, ny] = d.n, o = 4;
+      const sgn = it.hinge === 'b' ? 1 : -1, hz = G.horiz(it.wall), ux = hz ? sgn * it.w : 0, uy = hz ? 0 : sgn * it.w;
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <rect class="slidezone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}"/>
+        <line class="doorgap" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <line class="slidepanel" x1="${d.a[0] + nx * o}" y1="${d.a[1] + ny * o}" x2="${d.b[0] + nx * o}" y2="${d.b[1] + ny * o}"/>
+        <line class="doorarc" x1="${d.a[0] + nx * o + ux}" y1="${d.a[1] + ny * o + uy}" x2="${d.b[0] + nx * o + ux}" y2="${d.b[1] + ny * o + uy}"/>
+        <line class="hitline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/></g>`;
+    } else if (it.t === 'door') {
+      const d = G.door(it, p.room), [hx, hy] = d.hinge, [lx, ly] = d.leaf, [tx, ty] = d.tip;
+      const sweep = (lx - hx) * (ty - hy) - (ly - hy) * (tx - hx) > 0 ? 1 : 0;
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <path class="doorarea" d="M${hx} ${hy}L${lx} ${ly}A${d.r} ${d.r} 0 0 ${sweep} ${tx} ${ty}Z"/>
+        <line class="doorgap" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <line class="doorleaf" x1="${hx}" y1="${hy}" x2="${lx}" y2="${ly}"/>
+        <path class="doorarc" d="M${lx} ${ly}A${d.r} ${d.r} 0 0 ${sweep} ${tx} ${ty}"/>
+        <line class="hitline" x1="${hx}" y1="${hy}" x2="${lx}" y2="${ly}"/>
+        <line class="hitline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/></g>`;
+    } else {
+      const d = G.door(it, p.room), hz = G.horiz(it.wall);
+      // つかむ範囲は壁の外側に寄せる（窓の下に置いた机をつかめるように、内側は 3cm だけ）
+      const o = { top: -15, bottom: -3, left: -15, right: -3 }[it.wall];
+      const hx = hz ? d.a[0] : d.a[0] + o, hy = hz ? d.a[1] + o : d.a[1];
+      s += `<g class="${cls(it)}" data-id="${it.id}">
+        <line class="winline" x1="${d.a[0]}" y1="${d.a[1]}" x2="${d.b[0]}" y2="${d.b[1]}"/>
+        <rect class="hit" x="${hx}" y="${hy}" width="${hz ? it.w : 18}" height="${hz ? 18 : it.w}"/></g>`;
+    }
+  }
+  // 選んだ家具から壁・他の家具までの距離（60cm 未満は赤）
+  const c = cur && item(cur);
+  if (c && c.t === 'f') {
+    const r = G.fp(c), g = G.gaps(r, p.items.filter(i => i.t === 'f' && i !== c).map(G.fp), p.room);
+    const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+    const segs = [['left', r.x, cy, r.x - g.left, cy], ['right', r.x + r.w, cy, r.x + r.w + g.right, cy],
+                  ['up', cx, r.y, cx, r.y - g.up], ['down', cx, r.y + r.h, cx, r.y + r.h + g.down]];
+    for (const [k, x1, y1, x2, y2] of segs) {
+      const val = Math.round(g[k]); if (val <= 0) continue;
+      const n = val < NARROW ? ' narrow' : '';
+      s += `<line class="gap${n}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>
+        <text class="gaptxt${n}" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2}" font-size="${fs * 0.95}">${val}</text>`;
+    }
+  }
+  svg.innerHTML = s;
+}
+
+// ---------- シート ----------
+const cellNum = (k, label, v, unit = 'cm', extra = '') =>
+  `<label class="cell"><span>${label}</span><input data-k="${k}" type="number" inputmode="numeric" step="1" value="${esc(v)}" ${extra}><em>${unit}</em></label>`;
+const group = (title, cells, foot = '') =>
+  `${title ? `<p class="group-title">${title}</p>` : ''}<div class="group">${cells}</div>${foot ? `<p class="foot">${foot}</p>` : ''}`;
+const seg = (k, opts, cur) => `<div class="seg" role="group">${opts.map(([v, n]) =>
+  `<button data-seg="${k}" data-v="${v}" aria-pressed="${String(v) === String(cur)}">${n}</button>`).join('')}</div>`;
+
+function openSheet(name) {
+  sheet = name;
+  if (name !== 'item' && !wide.matches) sel = null;
+  render(true);
+}
+function closeSheet() {
+  sheet = null;
+  if (sel) { sel = null; }
+  render(true);
+}
+function select(id) {
+  sel = id;
+  if (id) { sheet = 'item'; if (userZoomed) ensureVisible(id); }
+  else if (sheet === 'item') sheet = null;
+  render(true);
+}
+
+function drawSheet() {
+  // PC は欄を出しっぱなしにする。何も開いていなければ一覧を出す
+  const name = sheet === 'item' && !(sel && item(sel)) ? null : sheet;
+  const shown = name || (wide.matches ? 'list' : null);
+  app.classList.toggle('sheet-open', !!shown);
+  document.querySelectorAll('.tb[data-sheet]').forEach(b => b.classList.toggle('on', b.dataset.sheet === shown));
+  if (!shown) return;
+  const body = $('sheetBody'), sub = $('sheetSub');
+  const [title, html, subtitle] = SHEETS[shown]();
+  $('sheetTitle').textContent = title;
+  sub.hidden = !subtitle; sub.textContent = subtitle || '';
+  $('sheetDone').hidden = wide.matches && shown === 'list';
+  body.innerHTML = html;
+  if (shown === 'item') {
+    const it = item(sel);
+    if (it.lock) body.querySelectorAll('[data-k="x"],[data-k="y"],[data-k="pos"],[data-k="wall"]').forEach(x => { x.disabled = true; });
+  }
+}
+
+const SHEETS = {
+  add: () => ['追加', `<p class="group-title">家具</p><div class="tiles">${PRESETS.map(([n, w, d, h], i) => {
+      const k = 40 / Math.max(w, d), rw = Math.max(6, w * k), rh = Math.max(6, d * k);
+      return `<button class="tile" data-preset="${i}"><svg viewBox="0 0 56 44"><rect x="${28 - rw / 2}" y="${22 - rh / 2}" width="${rw}" height="${rh}" rx="2"/></svg><b>${n}</b><small>${w}×${d}・高さ${h}</small></button>`;
+    }).join('')}</div>
+    <p class="group-title">ドア・窓</p><div class="tiles">${OPENINGS.map(([n, o], i) =>
+      `<button class="tile" data-open="${i}"><svg viewBox="0 0 56 44">${o.t === 'win' ? '<rect x="8" y="19" width="40" height="6" rx="1" style="fill:var(--win);stroke:none"/>' : o.kind === 'slide'
+        ? '<rect x="8" y="20" width="40" height="4" rx="1"/><rect x="30" y="26" width="18" height="3" rx="1" style="fill:none;stroke-dasharray:3 2"/>'
+        : '<path d="M10 34V10a24 24 0 0 1 24 24" style="fill:none;stroke:var(--furn-s);stroke-width:1.5;stroke-dasharray:3 2"/><rect x="9" y="10" width="3" height="24" rx="1"/>'}</svg><b>${n}</b><small>幅${o.w}・高さ${o.h}</small></button>`).join('')}</div>
+    <p class="foot">部屋の真ん中に置きます。置いたあとは指でドラッグして動かします。</p>`],
+  room: () => {
+    const r = P().room, a = G.area(r);
+    return ['部屋', group('大きさ', cellNum('roomW', '横幅', r.w) + cellNum('roomH', '縦の長さ', r.h) + cellNum('roomT', '天井の高さ', r.ht),
+      `約 ${a.jo.toFixed(1)} 畳（${a.m2.toFixed(1)}㎡）。壁の内側から内側までを測ります。6 畳はおよそ 260×350cm です。`) +
+      group('置くときの補助', `<label class="cell"><span>壁や家具に吸い付ける</span><input type="checkbox" class="switch" data-k="magnet" ${magnet ? 'checked' : ''}></label>`,
+        'PC では Shift を押しながら動かすと、一時的に吸い付きません。')];
+  },
+  warn: () => {
+    const { out, ids } = G.issues(P());
+    const rows = (saveFailed ? [['このブラウザに保存できませんでした。「その他」→「ファイルに書き出す」で残してください', []]] : []).concat(out.map((t, i) => [t, ids[i]]));
+    return ['注意', rows.length ? group('', rows.map(([t, xs]) =>
+      `<button class="cell" data-goto="${xs[0] || ''}"><i class="dot"></i><span>${esc(t)}</span>${xs[0] ? ico('chev') : ''}</button>`).join(''),
+      'タップすると、その家具やドアを選びます。')
+      : `<div class="group"><div class="empty">${ico('ok')}問題は見つかりません</div></div>`, rows.length ? `${rows.length} 件` : ''];
+  },
+  list: () => {
+    const { out, ids } = G.issues(P()), its = P().items;
+    const why = id => { const k = ids.findIndex(x => x.includes(id)); return k < 0 ? '' : out[k]; };
+    return ['置いたもの', its.length ? group('', its.map(i => `<button class="cell" data-goto="${i.id}">
+      ${why(i.id) ? '<i class="dot" aria-hidden="true"></i>' : ''}<span>${esc(itemName(i))}<small>${sizeText(i)}</small>${why(i.id) ? `<small class="why">注意：${esc(why(i.id))}</small>` : ''}</span>${i.lock ? ico('lock') : ''}${ico('chev')}</button>`).join(''))
+      : `<p class="foot">まだ何も置いていません。下の「追加」から家具を選んでください。</p>`, `${its.length} 個`];
+  },
+  plans: () => ['案', group('', state.plans.map((p, i) => `<button class="cell" data-plan="${i}"><span>${esc(p.name)}<small>${p.room.w}×${p.room.h}・${p.items.length} 個</small></span>${i === state.cur ? ico('check', 'ico check') : ''}</button>`).join('')) +
+    group('この案', `<button class="cell action" data-act="planNew">${ico('plus')}<span>新しい案</span></button>
+      <button class="cell action" data-act="planCopy">${ico('dup')}<span>この案を複製</span></button>
+      <button class="cell action" data-act="planRen"><span>名前を変える</span></button>
+      <button class="cell danger" data-act="planDel" ${state.plans.length < 2 ? 'disabled' : ''}>${ico('del')}<span>この案を削除</span></button>`,
+      '案を消しても、すぐなら「元に戻す」で戻せます。')],
+  more: () => ['その他', group('ファイル', `<button class="cell action" data-act="exp">${ico('out')}<span>ファイルに書き出す</span></button>
+      <button class="cell action" data-act="imp">${ico('in')}<span>ファイルを読み込む</span></button>
+      <button class="cell action" data-act="png">${ico('img')}<span>図を画像で保存</span></button>`,
+      '案はこのブラウザの中に自動で保存されます。別の端末へ移すときや、念のための控えには「ファイルに書き出す」を使います。') +
+    `<p class="group-title">文字の大きさ</p>${seg('ts', SIZES, TS)}`],
+  item: () => {
+    const it = item(sel), L = it.lock;
+    const acts = `<div class="acts">
+      ${it.t === 'f' ? `<button class="act" data-a="rot" ${L ? 'disabled' : ''}>${ico('rot')}90° 回す</button><button class="act" data-a="dup">${ico('dup')}複製</button>`
+        : `<button class="act" data-a="flip" ${L ? 'disabled' : ''}>${ico('flip')}${it.kind === 'slide' ? '引く向き' : '開く向き'}</button><span></span>`}
+      <button class="act${L ? ' on' : ''}" data-a="lock" aria-pressed="${!!L}">${ico(L ? 'lock' : 'unlock')}${L ? 'ロック中' : 'ロック'}</button>
+      <button class="act danger" data-a="del" ${L ? 'disabled' : ''}>${ico('del')}削除</button></div>`;
+    if (it.t === 'f') {
+      return [it.name, group('', cellNum('w', '幅', it.w) + cellNum('d', '奥行き', it.d) + cellNum('h', '高さ', it.h)) + acts +
+        group('名前', `<label class="cell"><input data-k="name" type="text" value="${esc(it.name)}" style="flex:1;text-align:left;color:var(--ink)" maxlength="40"></label>`) +
+        group('位置', cellNum('x', '左の壁から', it.x) + cellNum('y', '上の壁から', it.y), L ? 'ロック中は動かせません。寸法や名前は変えられます。' : '') +
+        group('その他', cellNum('c', '前の空き', it.c || 0) + `<label class="cell"><span>色</span><input data-k="col" type="color" value="${it.col || '#e5e5ea'}"></label>`,
+          '前の空きは、引き出しや扉を開けるのに要る奥行きです。図の太い線の側が前です。'),
+        `${it.w}×${it.d}・高さ${it.h} cm`];
+    }
+    const wallCell = `<label class="cell"><span>付ける壁</span><select data-k="wall">${Object.entries(WALLS).map(([k, n]) => `<option value="${k}"${k === it.wall ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
+    return [itemName(it), group('', cellNum('w', '幅', it.w) + (it.t === 'win' ? cellNum('sill', '床から下端まで', it.sill) : '') + cellNum('h', '高さ', it.h),
+        it.t === 'win' ? '窓の下端より高い家具を窓の前に置くと、注意に出ます。' : '') + acts +
+      (it.t === 'door' ? `<p class="group-title">種類</p>${seg('kind', [['swing', '開き戸'], ['slide', '引き戸']], it.kind)}` : '') +
+      group('位置', wallCell + cellNum('pos', '壁の端から', it.pos), '「壁の端」は、上下の壁なら左端、左右の壁なら上端です。'),
+      `幅${it.w}・高さ${it.h} cm`];
+  },
+};
+
+// ---------- シートの操作 ----------
+function setRot(it, rot) {
+  const r = G.fp(it), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  it.rot = rot % 360;
+  const n = G.fp(it);
+  it.x = Math.round(cx - n.w / 2); it.y = Math.round(cy - n.h / 2);
+}
+function fitOnWall(it) { it.w = clamp(it.w, 10, wallLen(it.wall, P().room)); it.pos = clamp(it.pos, 0, wallLen(it.wall, P().room) - it.w); }
+function addItem(it) {
+  mut(() => { it.id = uid(); if (it.t === 'f') { const r = P().room; it.x = Math.round((r.w - it.w) / 2 / 5) * 5; it.y = Math.round((r.h - it.d) / 2 / 5) * 5; } else fitOnWall(it); P().items.push(it); sel = it.id; sheet = 'item'; if (userZoomed) ensureVisible(it.id); });
+}
+
+$('sheetBody').addEventListener('focusin', e => {
+  if (e.target.matches('input:not([type=checkbox]):not([type=color]),select')) setTimeout(() => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+});
+$('sheetBody').addEventListener('change', e => {
+  const k = e.target.dataset.k; if (!k) return;
+  if (k === 'magnet') { magnet = e.target.checked; setPref('moyougae.magnet', magnet); return; }
+  if (k === 'roomW' || k === 'roomH' || k === 'roomT') {
+    const r = P().room, v = Math.round(e.target.valueAsNumber), key = { roomW: 'w', roomH: 'h', roomT: 'ht' }[k];
+    if (!(isFinite(v) && v >= (k === 'roomT' ? 100 : 50))) { drawSheet(); return; }
+    mut(() => { P().room = { ...r, [key]: v }; P().items.filter(i => i.t !== 'f').forEach(fitOnWall); fitView(); });
+    return;
+  }
+  const it = item(sel); if (!it) return;
+  const raw = e.target.value;
+  if (k === 'name' || k === 'wall' || k === 'col') {
+    mut(() => { it[k] = k === 'name' ? (raw.trim() || '家具') : raw; if (k === 'wall') fitOnWall(it); }, k !== 'col');
+    return;
+  }
+  const v = Math.round(e.target.valueAsNumber);
+  if (raw.trim() === '' || !isFinite(v)) { drawSheet(); return; } // 空欄は 0 にせず元の値に戻す
+  mut(() => {
+    if (k === 'w' || k === 'd') it[k] = Math.max(1, v);
+    else if (k === 'c' || k === 'sill') it[k] = Math.max(0, v);
+    else if (k === 'h') it.h = Math.max(1, v);
+    else it[k] = v;
+    if (it.t !== 'f') fitOnWall(it);
+  });
+});
+
+$('sheetBody').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const d = b.dataset, it = sel && item(sel);
+  if (d.preset !== undefined) { const [name, w, dd, h, c] = PRESETS[d.preset]; addItem({ t: 'f', name, w, d: dd, h: name === '柱・出っ張り' ? P().room.ht : h, c, rot: 0 }); return; }
+  if (d.open !== undefined) { addItem({ ...OPENINGS[d.open][1] }); return; }
+  if (d.goto !== undefined) { if (d.goto) select(d.goto); return; }
+  if (d.plan !== undefined) { state.cur = Number(d.plan); sel = null; hist = []; save(); fitView(); sheet = wide.matches ? null : 'plans'; render(true); return; }
+  if (d.seg === 'ts') { TS = Number(d.v); setPref('moyougae.fs', TS); applyTS(); render(true); return; }
+  if (d.seg === 'kind' && it) { mut(() => { it.kind = d.v; }); return; }
+  if (d.act) return ACTS[d.act]();
+  if (!it || !d.a) return;
+  if (d.a === 'lock') { mut(() => { if (it.lock) delete it.lock; else it.lock = true; }); return; }
+  if (it.lock && (d.a === 'rot' || d.a === 'del' || d.a === 'flip')) return;
+  if (d.a === 'rot') mut(() => setRot(it, it.rot + 90));
+  if (d.a === 'flip') mut(() => { it.hinge = it.hinge === 'b' ? 'a' : 'b'; });
+  if (d.a === 'del') mut(() => { P().items = P().items.filter(i => i !== it); sel = null; sheet = null; });
+  if (d.a === 'dup') mut(() => { const c = { ...it, id: uid(), x: it.x + 10, y: it.y + 10 }; delete c.lock; P().items.push(c); sel = c.id; });
+});
+
+const download = (blob, name) => {
+  // iOS Safari はページに付いていないリンクの click を無視することがある
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+const ACTS = {
+  planNew: () => mut(() => { const p = newPlan(`案${String.fromCharCode(65 + state.plans.length % 26)}`); p.room = { ...P().room }; state.plans.push(p); state.cur = state.plans.length - 1; sel = null; fitView(); }),
+  planCopy: () => mut(() => { const p = JSON.parse(JSON.stringify(P())); p.name += ' のコピー'; state.plans.push(p); state.cur = state.plans.length - 1; sel = null; }),
+  planRen: () => { const n = prompt('案の名前', P().name); if (n && n.trim()) mut(() => { P().name = n.trim().slice(0, 40); }); },
+  planDel: () => {
+    if (state.plans.length < 2 || !confirm(`「${P().name}」を削除しますか？（すぐなら「元に戻す」で戻せます）`)) return;
+    mut(() => { state.plans.splice(state.cur, 1); state.cur = Math.max(0, state.cur - 1); sel = null; fitView(); });
+  },
+  exp: () => download(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }), 'moyougae.json'),
+  imp: () => $('impFile').click(),
+  png: exportPng,
+};
+
+$('impFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let s; try { s = G.clean(JSON.parse(await f.text())); } catch (err) { s = null; }
+  if (!s) { alert('このファイルは読み込めません（模様替えで書き出したファイルを選んでください）'); return; }
+  // 今の案は消さず、読み込んだ案を後ろに足す
+  mut(() => { state.plans.push(...s.plans); state.cur = state.plans.length - s.plans.length; sel = null; sheet = 'plans'; fitView(); });
+};
+
+// 平面図を PNG で保存：部屋全体を 1600px で描き直し、CSS の色を各要素に直接書き込んでから画像にする
+function exportPng() {
+  const { w: W, h: H } = P().room, m = Math.max(W, H) * 0.1, v = { cx: W / 2, cy: H / 2, w: W + 2 * m, h: H + 2 * m }, px = 1600 * v.w / Math.max(v.w, v.h);
+  drawPlan(v, px, true);
+  const props = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'font-weight', 'text-anchor', 'dominant-baseline', 'paint-order'];
+  const src = [svg, ...svg.querySelectorAll('*')], c = svg.cloneNode(true), dst = [c, ...c.querySelectorAll('*')];
+  src.forEach((el, i) => { const cs = getComputedStyle(el); dst[i].setAttribute('style', (dst[i].getAttribute('style') || '') + ';' + props.map(k => `${k}:${cs.getPropertyValue(k)}`).join(';')); });
+  // 家具に付けた色は style にあるので、計算済みの色で上書きされないように先に付け直す
+  src.forEach((el, i) => { if (el.style && el.style.fill) dst[i].style.fill = el.style.fill; });
+  c.querySelectorAll('.hit,.hitline').forEach(el => el.remove());
+  c.setAttribute('width', px); c.setAttribute('height', px * v.h / v.w);
+  c.setAttribute('font-family', getComputedStyle(document.body).fontFamily);
+  drawPlan();
+  const img = new Image(), fail = () => alert('画像を作れませんでした。別のブラウザで試してください');
+  img.onerror = fail;
+  img.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const g = cv.getContext('2d'); g.fillStyle = getComputedStyle(document.body).backgroundColor; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0);
+    cv.toBlob(b => b ? download(b, `${P().name}.png`) : fail());
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(c));
+}
+
+// ---------- 上のバー・下のツールバー ----------
+document.querySelectorAll('.tb[data-sheet]').forEach(b => { b.onclick = () => (sheet === b.dataset.sheet && !wide.matches ? closeSheet() : openSheet(b.dataset.sheet)); });
+$('undo').onclick = undo;
+$('sheetDone').onclick = closeSheet;
+$('grab').onclick = () => $('sheet').classList.toggle('tall');
+$('planBtn').onclick = () => openSheet('plans');
+$('moreBtn').onclick = () => openSheet('more');
+$('show3d').onclick = () => View3D.open(P());
+$('fitBtn').onclick = () => { fitView(); drawPlan(); };
+
+// ---------- 平面図の指・マウス操作 ----------
+// 1 本指：家具をつかめばドラッグ、何もない所なら図を動かす。2 本指：拡大・縮小と移動。ホイール：拡大・縮小
+const ptrs = new Map();
+let pan = null, pinch = null;
+const pinchInfo = () => { const [a, b] = [...ptrs.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+function cancelDrag() {
+  if (!drag) return;
+  if (drag.moved) { Object.assign(drag.it, { x: drag.x, y: drag.y, pos: drag.pos }); render(false); }
+  drag = null;
+}
+svg.addEventListener('pointerdown', e => {
+  try { svg.setPointerCapture(e.pointerId); } catch (err) {} // 取れなくても操作は続ける
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  e.preventDefault();
+  if (ptrs.size === 2) {
+    // 2 本目の指が来たら、つかんでいた家具は元の位置に戻して拡大に切り替える
+    cancelDrag(); pan = null;
+    const pi = pinchInfo(); pinch = { ...pi, view0: { ...view }, anchor: toWorld(pi.x, pi.y) };
+    return;
+  }
+  if (ptrs.size > 2) return;
+  const g = e.target.closest('[data-id]');
+  if (!g) { pan = { x: e.clientX, y: e.clientY, view0: { ...view }, moved: false }; return; }
+  const it = item(g.dataset.id);
+  if (sel !== it.id) { sel = it.id; drawPlan(); }
+  drag = { locked: !!it.lock, it, q: toWorld(e.clientX, e.clientY), cx: e.clientX, cy: e.clientY, pid: e.pointerId, x: it.x, y: it.y, pos: it.pos, moved: false, before: JSON.stringify(state) };
+});
+svg.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && ptrs.size >= 2) {
+    const pi = pinchInfo();
+    zoomTo(pi.x, pi.y, pinch.view0.w * pinch.d / pi.d, pinch.anchor);
+    schedule(); return;
+  }
+  if (pan) {
+    if (!pan.moved && Math.hypot(e.clientX - pan.x, e.clientY - pan.y) < 6) return;
+    pan.moved = true;
+    const u = pan.view0.w / box().width;
+    view = { ...pan.view0, cx: pan.view0.cx - (e.clientX - pan.x) * u, cy: pan.view0.cy - (e.clientY - pan.y) * u }; userZoomed = true;
+    schedule(); return;
+  }
+  if (!drag || e.pointerId !== drag.pid || drag.locked) return; // ロック中は選ぶだけで動かさない
+  const q = toWorld(e.clientX, e.clientY), dx = q.x - drag.q.x, dy = q.y - drag.q.y, it = drag.it, p = P();
+  // タップの指のぶれで動かないよう、画面上で 8px 動くまではドラッグにしない
+  if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 8) return;
+  drag.moved = true;
+  const mag = magnet && !e.shiftKey, th = 10 * view.w / box().width; // 画面上 10px 以内なら吸い付く
+  if (it.t === 'f') {
+    const r = G.fp(it), os = p.items.filter(i => i.t === 'f' && i !== it).map(G.fp);
+    const cx = [0, p.room.w - r.w, ...os.flatMap(o => [o.x - r.w, o.x + o.w, o.x, o.x + o.w - r.w])];
+    const cy = [0, p.room.h - r.h, ...os.flatMap(o => [o.y - r.h, o.y + o.h, o.y, o.y + o.h - r.h])];
+    it.x = mag ? G.snap(drag.x + dx, cx, th) : Math.round(drag.x + dx);
+    it.y = mag ? G.snap(drag.y + dy, cy, th) : Math.round(drag.y + dy);
+    // 図の外へ出し切ってつかめなくなるのを防ぐ（少なくとも 20cm は部屋に残す）
+    it.x = clamp(it.x, 20 - r.w, p.room.w - 20); it.y = clamp(it.y, 20 - r.h, p.room.h - 20);
+  } else {
+    const len = wallLen(it.wall, p.room), v = drag.pos + (G.horiz(it.wall) ? dx : dy);
+    it.pos = clamp(mag ? G.snap(v, [0, len - it.w], th) : Math.round(v), 0, len - it.w);
+  }
+  schedule();
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (pinch) { if (ptrs.size < 2) pinch = null; return; } // 拡大の後に残った指では何もしない
+  if (pan) { if (!pan.moved && sel) select(null); pan = null; return; }
+  if (!drag || e.pointerId !== drag.pid) return;
+  if (drag.moved && JSON.stringify(state) !== drag.before) { hist.push(drag.before); if (hist.length > 100) hist.shift(); save(); }
+  drag = null; sheet = 'item'; render(true);
+}
+svg.addEventListener('pointerup', endPtr);
+svg.addEventListener('pointercancel', endPtr);
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  // shortcut: マウスのホイールは「行単位」か「50 以上の整数で横の動きなし」で見分ける。見分けを誤る機器があれば、設定で切り替えられるようにする
+  const mouse = e.deltaMode !== 0 || (Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50 && e.deltaX === 0);
+  if (!e.ctrlKey && !mouse) {
+    const u = view.w / box().width;
+    view = { ...view, cx: view.cx + e.deltaX * u, cy: view.cy + e.deltaY * u }; userZoomed = true;
+    schedule(); return;
+  }
+  const f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+  zoomTo(e.clientX, e.clientY, view.w / f, toWorld(e.clientX, e.clientY));
+  schedule();
+}, { passive: false });
+
+// 枠の大きさが変わったら（回転・シートの開閉・キーボード）、拡大率はそのままで描き直す
+let fitted = false;
+new ResizeObserver(() => {
+  if (!box().width) return;
+  if (ptrs.size) { drawPlan(); return; } // 指で操作している間は表示範囲を変えない
+  if (!fitted || !userZoomed) { fitView(); fitted = true; }
+  else if (sel) ensureVisible(sel);
+  drawPlan();
+}).observe($('stage'));
+wide.addEventListener('change', () => render(true));
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches?.('input,select,textarea') || document.querySelector('.v3d')) return; // 3D 表示中は平面図を動かさない
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.key === 'Escape') { closeSheet(); return; }
+  const it = sel && item(sel); if (!it || it.lock) return;
+  const step = e.shiftKey ? 10 : 1, mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (mv) {
+    e.preventDefault();
+    mut(() => {
+      if (it.t === 'f') { it.x += mv[0] * step; it.y += mv[1] * step; }
+      else { it.pos += (G.horiz(it.wall) ? mv[0] : mv[1]) * step; fitOnWall(it); }
+    });
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault(); mut(() => { P().items = P().items.filter(i => i !== it); sel = null; sheet = null; });
+  } else if (e.key.toLowerCase() === 'r' && it.t === 'f') {
+    mut(() => setRot(it, it.rot + 90));
+  }
+});
+
+try { fitView(); render(true); } catch (e) {
+  // 保存データが原因で描けないときは、初期状態で開き直す
+  console.error(e);
+  state = { plans: [newPlan('案A')], cur: 0 }; hist = []; fitView(); render(true);
+  alert('保存されていた案を読み込めなかったため、新しい案で開きました');
+}
+</script>
+</body>
+</html>
